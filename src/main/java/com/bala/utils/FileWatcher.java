@@ -31,7 +31,7 @@ import com.bala.drive.db.bean.EligibilityFile;
 @Service
 public class FileWatcher {
 
-	private static final Logger LOG = LoggerFactory.getLogger(FileWatcher.class);
+	private static final Logger logger = LoggerFactory.getLogger(FileWatcher.class);
 
 	private WatchService watcher;
 
@@ -63,7 +63,7 @@ public class FileWatcher {
 		try {
 			watcher.close();
 		} catch (IOException e) {
-			LOG.error("Error closing watcher service", e);
+			logger.error("Error closing watcher service", e);
 		}
 
 	}

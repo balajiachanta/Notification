@@ -11,12 +11,16 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.bala.aws.AWSConfig;
 import com.bala.drive.db.DriveDAO;
 import com.bala.drive.db.bean.ChooseSchedule;
 import com.bala.drive.notification.TriggerComp;
@@ -31,31 +35,49 @@ public class DriveScheduler{
 	@Autowired
 	private TriggerComp triggerComp;
 	
+	@Autowired
+	private AWSConfig awsConfig;
+	
+	@Value(value="${sqsqueue}")
+	private String awsFileNameQueue;
+	
+	private static final Logger logger = LoggerFactory.getLogger(DriveScheduler.class);
 
 	
-	@Scheduled(fixedDelay = 20000)  //(cron="*/2 * * * * MON-FRI")
+	//@Scheduled(fixedDelay = 20000)  //(cron="*/2 * * * * MON-FRI")
 	@Transactional
-	public void executeEveryOneMin() throws InterruptedException {
+	public void scheduleReadDirectory() throws InterruptedException {
 		
-		System.out.println("Run Job " + LocalDate.now()+ Thread.currentThread().getName());
+		logger.info("Run Job " + LocalDate.now()+ Thread.currentThread().getName());
 		List<ChooseSchedule> scheduleList= driveDAO.retrieveScheduleTasks();
-		System.out.println(" schedule "+scheduleList);
+		logger.info(" schedule "+scheduleList);
 		if(scheduleList.size() > 0){
 			
-			System.out.println("inside schedule");
+			logger.info("inside schedule");
 		
 			scheduleList.stream().forEach(
 				
 				s -> {
-					System.out.println("inside");
+					
 					this.readFile(driveDAO.getEligibilityFile(s.getFileSeq()).getDirPath(), s.getFileName(),s.getLineCount());
 					
 				});
 		}else{
-			System.out.println("noting to schedule");
+			logger.info("noting to schedule");
 		}
 		
 	}
+	
+	@Scheduled(fixedDelay = 20000)
+	public void scheduleReadAmazonSQS(){
+		logger.info("Schedule Amazon SQS Queue started");
+		
+		awsConfig.retrieveSqsMessages(awsFileNameQueue);
+		
+		logger.info("Schedule Amazon SQS Queue end");
+	}
+	
+	
 	
 	private void readFile(String path,String fileName, int lineCount){
 		
@@ -95,7 +117,7 @@ public class DriveScheduler{
             bufferedReader.close();    
             futureList.stream().forEach( f -> {
 				try {
-					System.out.println(f.get());
+					logger.info(f.get());
 				} catch (InterruptedException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -107,16 +129,14 @@ public class DriveScheduler{
             
         }
         catch(FileNotFoundException ex) {
-            System.out.println(
+            logger.error(
                 "Unable to open file '" + 
                 fileName + "'");                
         }
         catch(IOException ex) {
-            System.out.println(
+        	 logger.error(
                 "Error reading file '" 
-                + fileName + "'");                  
-            // Or we could just do this: 
-            // ex.printStackTrace();
+                + fileName + "'");   
         }
 	}
 }
